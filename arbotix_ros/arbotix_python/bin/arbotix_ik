@@ -1,0 +1,310 @@
+#!/usr/bin/env python
+
+"""
+  A simple Controller GUI to drive robots and pose heads.
+  Copyright (c) 2008-2011 Michael E. Ferguson.  All right reserved.
+
+  Redistribution and use in source and binary forms, with or without
+  modification, are permitted provided that the following conditions are met:
+      * Redistributions of source code must retain the above copyright
+        notice, this list of conditions and the following disclaimer.
+      * Redistributions in binary form must reproduce the above copyright
+        notice, this list of conditions and the following disclaimer in the
+        documentation and/or other materials provided with the distribution.
+      * Neither the name of Vanadium Labs LLC nor the names of its
+        contributors may be used to endorse or promote products derived
+        from this software without specific prior written permission.
+
+  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+  DISCLAIMED. IN NO EVENT SHALL VANADIUM LABS BE LIABLE FOR ANY DIRECT, INDIRECT,
+  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA,
+  OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+  LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
+  OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+  ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+"""
+
+import rospy
+import wx
+import numpy as np
+import math
+
+from math import radians
+
+from geometry_msgs.msg import Twist
+from geometry_msgs.msg import Vector3
+from sensor_msgs.msg import JointState
+from std_msgs.msg import Float64
+from arbotix_msgs.srv import Relax
+from arbotix_python.joints import *
+
+width = 325
+L_B2 = 0.07
+L_23 = 0.107
+L_34 = 0.107
+L_4G = 0.1091
+TargetZ = 0.38
+
+class servoSlider():
+    def __init__(self, parent, min_angle, max_angle, name, i):
+        self.name = name
+        if name.find("_joint") > 0: # remove _joint for display name
+            name = name[0:-6]
+        self.position = wx.Slider(parent, -1, 0, int(min_angle*100), int(max_angle*100), wx.DefaultPosition, (150, -1), wx.SL_HORIZONTAL)
+        self.enabled = wx.CheckBox(parent, i, name+":")
+        self.enabled.SetValue(False)
+        self.position.Disable()
+
+    def setPosition(self, angle):
+        self.position.SetValue(int(angle*100))
+
+    def getPosition(self):
+        return self.position.GetValue()/100.0
+
+class IKControl(wx.Frame):
+    TIMER_ID = 100
+
+    def __init__(self, parent, debug = False):
+        self.flag=0
+        wx.Frame.__init__(self, parent, -1, "ArbotiX Controller GUI", style = wx.DEFAULT_FRAME_STYLE & ~ (wx.RESIZE_BORDER | wx.MAXIMIZE_BOX))
+        sizer = wx.GridBagSizer(5,5)
+
+        # Move Base
+
+        self.cmd_vel = rospy.Publisher('cmd_vel', Twist, queue_size=5)
+
+        # Move Servos
+        servo = wx.StaticBox(self, -1, 'Move Servos')
+        servo.SetFont(wx.Font(10, wx.DEFAULT, wx.NORMAL, wx.BOLD))
+        servoBox = wx.StaticBoxSizer(servo,orient=wx.VERTICAL)
+        servoSizer = wx.GridBagSizer(5,5)
+
+        joint_defaults = getJointsFromURDF()
+
+        i = 0
+        dynamixels = rospy.get_param('/arbotix/dynamixels', dict())
+        self.servos = list()
+        self.publishers = list()
+        self.relaxers = list()
+        self.targetpos = Vector3()
+
+        joints = rospy.get_param('/arbotix/joints', dict())
+        # create sliders and publishers
+        for name in sorted(joints.keys()):
+            # pull angles
+            min_angle, max_angle = getJointLimits(name, joint_defaults)
+            # create publisher
+            self.publishers.append(rospy.Publisher(name+'/command', Float64, queue_size=5))
+            if rospy.get_param('/arbotix/joints/'+name+'/type','dynamixel') == 'dynamixel':
+                self.relaxers.append(rospy.ServiceProxy(name+'/relax', Relax))
+            else:
+                self.relaxers.append(None)
+            # create slider
+            s = servoSlider(self, min_angle, max_angle, name, i)
+            servoSizer.Add(s.enabled,(i,0), wx.GBSpan(1,1),wx.ALIGN_CENTER_VERTICAL)
+            servoSizer.Add(s.position,(i,1), wx.GBSpan(1,1),wx.ALIGN_CENTER_VERTICAL)
+            self.servos.append(s)
+            i += 1
+
+        # add everything
+        servoBox.Add(servoSizer)
+        sizer.Add(servoBox, (0,1), wx.GBSpan(1,1), wx.EXPAND|wx.TOP|wx.BOTTOM|wx.RIGHT,5)
+        self.Bind(wx.EVT_CHECKBOX, self.enableSliders)
+        # now we can subscribe
+        rospy.Subscriber('joint_states', JointState, self.stateCb)
+        # now we can subscribe
+        rospy.Subscriber('joint_states', JointState, self.stateCb)
+
+        self.targetpos.x = 0.0
+        self.targetpos.y = 0.0
+        self.targetpos.z = TargetZ
+        # timer for output
+
+
+    def onClose(self, event):
+        self.timer.Stop()
+        self.Destroy()
+
+    def enableSliders(self, event):
+        servo = event.GetId()
+        if event.IsChecked():
+            self.servos[servo].position.Enable()
+        else:
+            self.servos[servo].position.Disable()
+            if self.relaxers[servo]:
+                self.relaxers[servo]()
+
+    def stateCb(self, msg):
+        for servo in self.servos:
+            if not servo.enabled.IsChecked():
+                try:
+                    idx = msg.name.index(servo.name)
+                    servo.setPosition(msg.position[idx])
+                except:
+                    pass
+
+    def onPaint(self, event=None):
+        # this is the wx drawing surface/canvas
+        dc = wx.PaintDC(self.movebase)
+        dc.Clear()
+        # draw crosshairs
+        dc.SetPen(wx.Pen("black",1))
+        dc.DrawLine(width/2, 0, width/2, width)
+        dc.DrawLine(0, width/2, width, width/2)
+        dc.SetPen(wx.Pen("red",2))
+        dc.SetBrush(wx.Brush('red', wx.SOLID))
+        dc.SetPen(wx.Pen("black",2))
+        dc.DrawCircle((width/2) + self.X*(width/2), (width/2) - self.Y*(width/2), 5)
+
+    def onMove(self, event=None):
+        if event.LeftIsDown():
+            pt = event.GetPosition()
+            if pt[0] > 0 and pt[0] < width and pt[1] > 0 and pt[1] < width:
+                self.forward = ((width/2)-pt[1])/2
+                self.turn = (pt[0]-(width/2))/2
+                self.X = (pt[0]-(width/2.0))/(width/2.0)
+                self.Y = ((width/2.0)-pt[1])/(width/2.0)
+        else:
+            self.forward = 0; self.Y = 0
+            self.turn = 0; self.X = 0
+        self.onPaint()
+
+    def poscallback(self,data):
+        self.targetpos.x = data.x
+        self.targetpos.y = data.y
+        self.targetpos.z = data.z
+
+    def wristcal(self,deg):
+        if (deg < -2.61 or 2.61 < deg):
+            wrist_ang = -math.pi/2
+        else:
+            wrist_ang = math.pi/2
+        return wrist_ang
+
+    def IKsol(self):
+        rospy.Subscriber("tap_pos", Vector3, self.poscallback)
+        arm_shoulder_pan = math.atan2(self.targetpos.y,self.targetpos.x)
+        arm_elbow_flex = 0.0
+        arm_shoulder_lift = 0.0
+        arm_wrist_flex = 0.0
+
+        wrist_ang = self.wristcal(arm_shoulder_pan)
+
+        if wrist_ang == math.pi/2:
+            R_24 = math.sqrt((self.targetpos.x)**2 + (self.targetpos.y**2)) - L_4G*math.cos(wrist_ang)
+            Z_24 = self.targetpos.z + L_4G*math.sin(wrist_ang) - L_B2
+        else:
+            if arm_shoulder_pan >= 0:
+                arm_shoulder_pan = arm_shoulder_pan - math.pi
+            else:
+                arm_shoulder_pan = arm_shoulder_pan + math.pi
+            R_24 = math.sqrt((self.targetpos.x)**2 + (self.targetpos.y**2)) - L_4G*math.cos(wrist_ang)
+            Z_24 = self.targetpos.z + L_4G*math.sin(-wrist_ang) - L_B2
+
+        a=0
+
+        #rospy.loginfo(wrist_ang)
+        if math.sqrt((self.targetpos.x)**2 + (self.targetpos.y**2)) < (L_23 + L_34):
+            a=1
+            if wrist_ang == math.pi/2:
+                if -1 <= ((L_23)**2 - (L_34)**2 + (R_24)**2 + (Z_24) **2)/(2 * L_23 * math.sqrt((R_24)**2 + (Z_24)**2)) and ((L_23)**2 - (L_34)**2 + (R_24)**2 + (Z_24) **2)/(2 * L_23 * math.sqrt((R_24)**2 + (Z_24)**2)) <=1:
+                    theta_2d = math.acos(((L_23)**2 - (L_34)**2 + (R_24)**2 + (Z_24) **2)/(2 * L_23 * math.sqrt((R_24)**2 + (Z_24)**2)))
+                    a=2
+                    if -1 <= ((L_34)**2 - (L_23)**2 + (R_24)**2 + (Z_24)**2)/(2 * L_34 * math.sqrt((R_24)**2 + (Z_24)**2)) and ((L_34)**2 - (L_23)**2 + (R_24)**2 + (Z_24)**2)/(2 * L_34 * math.sqrt((R_24)**2 + (Z_24)**2)) <= 1:
+                        theta_3d = math.acos(((L_34)**2 - (L_23)**2 + (R_24)**2 + (Z_24)**2)/(2 * L_34 * math.sqrt((R_24)**2 + (Z_24)**2)))
+
+                        theta_4d = math.atan2(Z_24, R_24)
+
+                        arm_shoulder_lift = math.pi/2 - (theta_2d + theta_4d)
+                        arm_elbow_flex = theta_2d + theta_3d
+                        arm_wrist_flex = theta_4d - theta_3d + wrist_ang
+
+                        if self.flag == 0:
+                            rospy.loginfo(arm_shoulder_lift * 180 / math.pi)
+                            rospy.loginfo(arm_elbow_flex * 180 / math.pi)
+                            rospy.loginfo(arm_wrist_flex * 180 / math.pi)
+                            rospy.loginfo(arm_shoulder_pan * 180 / math.pi)
+                            self.flag = 1
+
+                        a=3
+                    else:
+                        #rospy.loginfo(((L_34)**2 - (L_23)**2 + (R_24)**2 + (Z_24)**2)/(2 * L_34 * math.sqrt((R_24)**2 + (Z_24)**2)))
+                        pass
+
+                else:
+                    #rospy.loginfo(((L_23)**2 - (L_34)**2 + (R_24)**2 + (Z_24) **2)/(2 * L_23 * math.sqrt((R_24)**2 + (Z_24)**2)))
+                    pass
+            else:
+                if -1 <= ((L_23)**2 - (L_34)**2 + (R_24)**2 + (Z_24) **2)/(2 * L_23 * math.sqrt((R_24)**2 + (Z_24)**2)) and ((L_23)**2 - (L_34)**2 + (R_24)**2 + (Z_24) **2)/(2 * L_23 * math.sqrt((R_24)**2 + (Z_24)**2)) <=1:
+                    theta_2d = math.acos(((L_23)**2 - (L_34)**2 + (R_24)**2 + (Z_24) **2)/(2 * L_23 * math.sqrt((R_24)**2 + (Z_24)**2)))
+                    a=2
+                    if -1 <= ((L_34)**2 - (L_23)**2 + (R_24)**2 + (Z_24)**2)/(2 * L_34 * math.sqrt((R_24)**2 + (Z_24)**2)) and ((L_34)**2 - (L_23)**2 + (R_24)**2 + (Z_24)**2)/(2 * L_34 * math.sqrt((R_24)**2 + (Z_24)**2)) <= 1:
+                        theta_3d = math.acos(((L_34)**2 - (L_23)**2 + (R_24)**2 + (Z_24)**2)/(2 * L_34 * math.sqrt((R_24)**2 + (Z_24)**2)))
+
+                        theta_4d = math.atan2(Z_24, R_24)
+
+                        arm_shoulder_lift = -(math.pi/2 - (theta_2d + theta_4d))
+                        arm_elbow_flex = -(theta_2d + theta_3d)
+                        arm_wrist_flex = -(theta_4d - theta_3d - wrist_ang)
+
+                        if self.flag == 0:
+                            rospy.loginfo(arm_shoulder_pan * 180 / math.pi)
+                            rospy.loginfo(arm_shoulder_lift * 180 / math.pi)
+                            rospy.loginfo(arm_elbow_flex * 180 / math.pi)
+                            rospy.loginfo(arm_wrist_flex * 180 / math.pi)
+                            rospy.loginfo(arm_shoulder_pan * 180 / math.pi)
+                            self.flag = 1
+
+                        a=3
+                    else:
+                        #rospy.loginfo(((L_34)**2 - (L_23)**2 + (R_24)**2 + (Z_24)**2)/(2 * L_34 * math.sqrt((R_24)**2 + (Z_24)**2)))
+                        pass
+
+                else:
+                    #rospy.loginfo(((L_23)**2 - (L_34)**2 + (R_24)**2 + (Z_24) **2)/(2 * L_23 * math.sqrt((R_24)**2 + (Z_24)**2)))
+                    pass
+        else:
+            pass
+
+
+        deg = np.array([arm_elbow_flex,arm_shoulder_lift,arm_shoulder_pan,arm_wrist_flex,0])
+        #deg = np.array([0.0,0.0,0.0,0.0,0.0])
+        #rospy.loginfo(deg)
+        #rospy.loginfo(a)
+        return deg
+
+
+
+
+    def update(self):
+        count=0
+        deg = self.IKsol()
+        # send joint updates
+        for s,p in zip(self.servos,self.publishers):
+
+            d = Float64()
+            d.data = deg[count]
+            #rospy.loginfo(d.data)
+            p.publish(d)
+            count=count+1
+            #if s.enabled.IsChecked():
+
+        # send base updates
+        t = Twist()
+        rospy.loginfo("publishing")
+        self.cmd_vel.publish(t)
+
+
+
+
+if __name__ == '__main__':
+    # initialize GUI
+    rospy.init_node('IKControl')
+    app = wx.PySimpleApp()
+    frame = IKControl(None, True)
+    while frame.flag != 5:
+        frame.update()
+    #app.MainLoop()
