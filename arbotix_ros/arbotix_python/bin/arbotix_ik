@@ -118,6 +118,7 @@ class IKControl(wx.Frame):
         # now we can subscribe
         rospy.Subscriber('joint_states', JointState, self.stateCb)
 
+        rospy.Subscriber("tap_pos", Vector3, self.poscallback)
         self.targetpos.x = 0.0
         self.targetpos.y = 0.0
         self.targetpos.z = TargetZ
@@ -173,6 +174,7 @@ class IKControl(wx.Frame):
         self.onPaint()
 
     def poscallback(self,data):
+        print(data.x)
         self.targetpos.x = data.x
         self.targetpos.y = data.y
         self.targetpos.z = data.z
@@ -185,7 +187,7 @@ class IKControl(wx.Frame):
         return wrist_ang
 
     def IKsol(self):
-        rospy.Subscriber("tap_pos", Vector3, self.poscallback)
+
         arm_shoulder_pan = math.atan2(self.targetpos.y,self.targetpos.x)
         arm_elbow_flex = 0.0
         arm_shoulder_lift = 0.0
@@ -294,7 +296,7 @@ class IKControl(wx.Frame):
 
         # send base updates
         t = Twist()
-        rospy.loginfo("publishing")
+        #rospy.loginfo("publishing")
         self.cmd_vel.publish(t)
 
 

@@ -17,7 +17,7 @@ def listner():
 def geomPub():
     pub = rospy.Publisher('tap_pos',Vector3,queue_size=10)
     rospy.init_node('geompub',anonymous = True)
-    rate = rospy.Rate(0.5)
+    rate = rospy.Rate(30)
 
     a = [0.0, 0.15, -0.07]
     b = [0.15, 0.0, -0.07]
@@ -29,7 +29,7 @@ def geomPub():
     while not rospy.is_shutdown():
         listner()
 
-        print(hit_num)
+        #print(hit_num)
         if hit_num == 0:
             tapped_pos.x = a[0]
             tapped_pos.y = a[1]
@@ -46,7 +46,7 @@ def geomPub():
             flag = 0
 
         pub.publish(tapped_pos)
-        print(tapped_pos.z)
+        #print(tapped_pos.z)
         rate.sleep()
 
 if __name__ == '__main__':

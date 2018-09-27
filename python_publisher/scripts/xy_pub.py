@@ -19,7 +19,7 @@ def listner():
 def geomPub():
     pub = rospy.Publisher('tap_pos',Vector3,queue_size=10)
     rospy.init_node('geompub',anonymous = True)
-    rate = rospy.Rate(0.5)
+    rate = rospy.Rate(30)
 
     tapped_pos = Vector3()
 

@@ -112,8 +112,7 @@ class FKControl(wx.Frame):
         self.Bind(wx.EVT_CHECKBOX, self.enableSliders)
         # now we can subscribe
         rospy.Subscriber('joint_states', JointState, self.stateCb)
-        # now we can subscribe
-        rospy.Subscriber('joint_states', JointState, self.stateCb)
+
 
         self.targetpos.x = 0.0
         self.targetpos.y = 0.0
@@ -125,7 +124,11 @@ class FKControl(wx.Frame):
         # timer for output
 
     def deg_callback(self, data):
-        self.deg_of_each_servo = data.data
+        a = 0
+        for i in data.data:
+            self.deg_of_each_servo[a] = data.data[a]
+            a = a + 1
+
 
     def onClose(self, event):
         self.timer.Stop()

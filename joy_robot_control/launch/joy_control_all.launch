@@ -1,0 +1,5 @@
+<launch>
+  <node name="joy_node" pkg="joy" type="joy_node"/>
+  <node name="arbotix_fk" pkg="arbotix_python" type="arbotix_fk"/>
+  <node name="joy_control_all" pkg="joy_robot_control" type="joy_control_all.py" output="screen"/>
+</launch>
