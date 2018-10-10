@@ -1,0 +1,9 @@
+<launch>
+
+  <include file="$(find leap_motion)/launch/sensor_sender.launch">
+  </include>
+
+  <node name="arbotix_ik_gxyzp" pkg="arbotix_python" type="arbotix_ik_gxyzp"/>
+  <node name="leap_gxyzp_pub" pkg="leap_motion" type="leap_gxyzp_pub.py"/>
+
+</launch>

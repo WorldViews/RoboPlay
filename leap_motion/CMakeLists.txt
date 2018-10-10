@@ -83,6 +83,7 @@ include_directories(
   include
   ${catkin_INCLUDE_DIRS}
   ${PROJECT_SOURCE_DIR}/LeapSDK/include/
+  ${PROJECT_SOURCE_DIR}/include
 )
 
 ## Declare a C++ library
@@ -95,6 +96,7 @@ add_dependencies(lmc_listener
 target_link_libraries(lmc_listener
   ${catkin_LIBRARIES}
   ${PROJECT_SOURCE_DIR}/LeapSDK/include/Leap.h
+  ${PROJECT_SOURCE_DIR}/include/Leap.h
 )
 
 # Check system architecture (32-bit, 64-bit etc)

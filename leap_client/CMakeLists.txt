@@ -26,7 +26,7 @@ catkin_package(INCLUDE_DIRS include DEPENDS message_runtime std_msgs geometry_ms
 ###########
 ## Build ##
 ###########
-include_directories(include ${INCLUDE_DIRECTORIES} ${catkin_INCLUDE_DIRS} ${LEAPSDK}/include)
+include_directories(include ${INCLUDE_DIRECTORIES} ${catkin_INCLUDE_DIRS} ${PROJECT_SOURCE_DIR}/include/Leap.h)
 if(CMAKE_SIZEOF_VOID_P EQUAL 8) 
     set(arch_64 TRUE) 
 else() 

@@ -27,7 +27,6 @@
   ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 
-
 import rospy
 import wx
 import numpy as np
@@ -39,11 +38,15 @@ from geometry_msgs.msg import Twist
 from geometry_msgs.msg import Vector3
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Float64
-from std_msgs.msg import Float64MultiArray
 from arbotix_msgs.srv import Relax
 from arbotix_python.joints import *
 
 width = 325
+L_B2 = 0.07
+L_23 = 0.107
+L_34 = 0.107
+L_4G = 0.1091
+TargetZ = 0.38
 
 class servoSlider():
     def __init__(self, parent, min_angle, max_angle, name, i):
@@ -61,7 +64,7 @@ class servoSlider():
     def getPosition(self):
         return self.position.GetValue()/100.0
 
-class FKControl(wx.Frame):
+class IKControl(wx.Frame):
     TIMER_ID = 100
 
     def __init__(self, parent, debug = False):
@@ -112,22 +115,14 @@ class FKControl(wx.Frame):
         self.Bind(wx.EVT_CHECKBOX, self.enableSliders)
         # now we can subscribe
         rospy.Subscriber('joint_states', JointState, self.stateCb)
+        # now we can subscribe
+        rospy.Subscriber('joint_states', JointState, self.stateCb)
 
-
+        rospy.Subscriber("tap_pos", Vector3, self.poscallback)
         self.targetpos.x = 0.0
         self.targetpos.y = 0.0
-        self.targetpos.z = 0.38
-
-        self.deg_of_each_servo = [1.21, 1.01, -1.57, 0.00, 0.70]
-
-        self.deg_array = rospy.Subscriber('deg_of_servo', Float64MultiArray, self.deg_callback)
+        self.targetpos.z = TargetZ
         # timer for output
-
-    def deg_callback(self, data):
-        a = 0
-        for i in data.data:
-            self.deg_of_each_servo[a] = data.data[a]
-            a = a + 1
 
 
     def onClose(self, event):
@@ -179,9 +174,10 @@ class FKControl(wx.Frame):
         self.onPaint()
 
     def poscallback(self,data):
+        print(data.x)
         self.targetpos.x = data.x
         self.targetpos.y = data.y
-        #self.targetpos.z = data.z
+        self.targetpos.z = data.z
 
     def wristcal(self,deg):
         if (deg < -2.61 or 2.61 < deg):
@@ -190,23 +186,117 @@ class FKControl(wx.Frame):
             wrist_ang = math.pi/2
         return wrist_ang
 
+    def IKsol(self):
+
+        arm_shoulder_pan = math.atan2(self.targetpos.y,self.targetpos.x)
+        arm_elbow_flex = 0.0
+        arm_shoulder_lift = 0.0
+        arm_wrist_flex = 0.0
+
+        wrist_ang = self.wristcal(arm_shoulder_pan)
+
+        if wrist_ang == math.pi/2:
+            R_24 = math.sqrt((self.targetpos.x)**2 + (self.targetpos.y**2)) - L_4G*math.cos(wrist_ang)
+            Z_24 = self.targetpos.z + L_4G*math.sin(wrist_ang) - L_B2
+        else:
+            if arm_shoulder_pan >= 0:
+                arm_shoulder_pan = arm_shoulder_pan - math.pi
+            else:
+                arm_shoulder_pan = arm_shoulder_pan + math.pi
+            R_24 = math.sqrt((self.targetpos.x)**2 + (self.targetpos.y**2)) - L_4G*math.cos(wrist_ang)
+            Z_24 = self.targetpos.z + L_4G*math.sin(-wrist_ang) - L_B2
+
+        a=0
+
+        #rospy.loginfo(wrist_ang)
+        if math.sqrt((self.targetpos.x)**2 + (self.targetpos.y**2)) < (L_23 + L_34):
+            a=1
+            if wrist_ang == math.pi/2:
+                if -1 <= ((L_23)**2 - (L_34)**2 + (R_24)**2 + (Z_24) **2)/(2 * L_23 * math.sqrt((R_24)**2 + (Z_24)**2)) and ((L_23)**2 - (L_34)**2 + (R_24)**2 + (Z_24) **2)/(2 * L_23 * math.sqrt((R_24)**2 + (Z_24)**2)) <=1:
+                    theta_2d = math.acos(((L_23)**2 - (L_34)**2 + (R_24)**2 + (Z_24) **2)/(2 * L_23 * math.sqrt((R_24)**2 + (Z_24)**2)))
+                    a=2
+                    if -1 <= ((L_34)**2 - (L_23)**2 + (R_24)**2 + (Z_24)**2)/(2 * L_34 * math.sqrt((R_24)**2 + (Z_24)**2)) and ((L_34)**2 - (L_23)**2 + (R_24)**2 + (Z_24)**2)/(2 * L_34 * math.sqrt((R_24)**2 + (Z_24)**2)) <= 1:
+                        theta_3d = math.acos(((L_34)**2 - (L_23)**2 + (R_24)**2 + (Z_24)**2)/(2 * L_34 * math.sqrt((R_24)**2 + (Z_24)**2)))
+
+                        theta_4d = math.atan2(Z_24, R_24)
+
+                        arm_shoulder_lift = math.pi/2 - (theta_2d + theta_4d)
+                        arm_elbow_flex = theta_2d + theta_3d
+                        arm_wrist_flex = theta_4d - theta_3d + wrist_ang
+
+                        if self.flag == 0:
+                            rospy.loginfo(arm_shoulder_lift * 180 / math.pi)
+                            rospy.loginfo(arm_elbow_flex * 180 / math.pi)
+                            rospy.loginfo(arm_wrist_flex * 180 / math.pi)
+                            rospy.loginfo(arm_shoulder_pan * 180 / math.pi)
+                            self.flag = 1
+
+                        a=3
+                    else:
+                        #rospy.loginfo(((L_34)**2 - (L_23)**2 + (R_24)**2 + (Z_24)**2)/(2 * L_34 * math.sqrt((R_24)**2 + (Z_24)**2)))
+                        pass
+
+                else:
+                    #rospy.loginfo(((L_23)**2 - (L_34)**2 + (R_24)**2 + (Z_24) **2)/(2 * L_23 * math.sqrt((R_24)**2 + (Z_24)**2)))
+                    pass
+            else:
+                if -1 <= ((L_23)**2 - (L_34)**2 + (R_24)**2 + (Z_24) **2)/(2 * L_23 * math.sqrt((R_24)**2 + (Z_24)**2)) and ((L_23)**2 - (L_34)**2 + (R_24)**2 + (Z_24) **2)/(2 * L_23 * math.sqrt((R_24)**2 + (Z_24)**2)) <=1:
+                    theta_2d = math.acos(((L_23)**2 - (L_34)**2 + (R_24)**2 + (Z_24) **2)/(2 * L_23 * math.sqrt((R_24)**2 + (Z_24)**2)))
+                    a=2
+                    if -1 <= ((L_34)**2 - (L_23)**2 + (R_24)**2 + (Z_24)**2)/(2 * L_34 * math.sqrt((R_24)**2 + (Z_24)**2)) and ((L_34)**2 - (L_23)**2 + (R_24)**2 + (Z_24)**2)/(2 * L_34 * math.sqrt((R_24)**2 + (Z_24)**2)) <= 1:
+                        theta_3d = math.acos(((L_34)**2 - (L_23)**2 + (R_24)**2 + (Z_24)**2)/(2 * L_34 * math.sqrt((R_24)**2 + (Z_24)**2)))
+
+                        theta_4d = math.atan2(Z_24, R_24)
+
+                        arm_shoulder_lift = -(math.pi/2 - (theta_2d + theta_4d))
+                        arm_elbow_flex = -(theta_2d + theta_3d)
+                        arm_wrist_flex = -(theta_4d - theta_3d - wrist_ang)
+
+                        if self.flag == 0:
+                            rospy.loginfo(arm_shoulder_pan * 180 / math.pi)
+                            rospy.loginfo(arm_shoulder_lift * 180 / math.pi)
+                            rospy.loginfo(arm_elbow_flex * 180 / math.pi)
+                            rospy.loginfo(arm_wrist_flex * 180 / math.pi)
+                            rospy.loginfo(arm_shoulder_pan * 180 / math.pi)
+                            self.flag = 1
+
+                        a=3
+                    else:
+                        #rospy.loginfo(((L_34)**2 - (L_23)**2 + (R_24)**2 + (Z_24)**2)/(2 * L_34 * math.sqrt((R_24)**2 + (Z_24)**2)))
+                        pass
+
+                else:
+                    #rospy.loginfo(((L_23)**2 - (L_34)**2 + (R_24)**2 + (Z_24) **2)/(2 * L_23 * math.sqrt((R_24)**2 + (Z_24)**2)))
+                    pass
+        else:
+            pass
+
+
+        deg = np.array([arm_elbow_flex,arm_shoulder_lift,arm_shoulder_pan,arm_wrist_flex,0])
+        #deg = np.array([0.0,0.0,0.0,0.0,0.0])
+        #rospy.loginfo(deg)
+        #rospy.loginfo(a)
+        return deg
+
+
+
+
     def update(self):
         count=0
-
+        deg = self.IKsol()
         # send joint updates
         for s,p in zip(self.servos,self.publishers):
 
             d = Float64()
-            d.data = self.deg_of_each_servo[count]
-            if count == 3:
-                rospy.loginfo(d.data)
+            d.data = deg[count]
+            #rospy.loginfo(d.data)
             p.publish(d)
             count=count+1
             #if s.enabled.IsChecked():
 
         # send base updates
         t = Twist()
-
+        #rospy.loginfo("publishing")
         self.cmd_vel.publish(t)
 
 
@@ -214,9 +304,9 @@ class FKControl(wx.Frame):
 
 if __name__ == '__main__':
     # initialize GUI
-    rospy.init_node('FKControl')
+    rospy.init_node('IKControl')
     app = wx.PySimpleApp()
-    frame = FKControl(None, True)
+    frame = IKControl(None, True)
     while frame.flag != 5:
         frame.update()
     #app.MainLoop()
