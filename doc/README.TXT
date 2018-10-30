@@ -10,10 +10,10 @@ To run robot arm
 In terminal type
    sudo chmod 777 /dev/ttyUSB0
    password: <pwd>
-   roslaunch phantom_rst arm.launch
+   roslaunch phantomx_rst arm.launch
 
 Create another terminal (e.g. using ctrl-alt-T)
 In new terminal type
 
-   roslaunch leap_motion leap.robot_gxyzp.launch
+   roslaunch leap_motion leap_robot_gxyzp.launch
 
