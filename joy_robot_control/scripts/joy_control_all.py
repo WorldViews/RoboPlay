@@ -12,7 +12,7 @@ ServoAngles = [0.0, 0.0, 0.0, 0.0, 0.0]
 def joy_callback(data):
     global JoyAngles
     a = 0
-    k_arm = 0.1
+    k_arm = 0.2
     k_grapple = 0.3
 
     JoyAngles[0] = - k_arm * data.axes[1]       #Arm

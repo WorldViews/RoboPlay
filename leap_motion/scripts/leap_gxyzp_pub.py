@@ -41,13 +41,14 @@ def callback_ros(data):
 
     Center.translation.x = -(data.pinky_proximal.x + data.thumb_metacarpal.x)/2/1000
     Center.translation.y = (data.pinky_proximal.z + data.thumb_metacarpal.z)/2/1000 - 0.10
-    Center.translation.z = (data.pinky_proximal.y + data.thumb_metacarpal.y)/2/1000 -0.10
-    Center.rotation.x = - data.ypr.y * math.pi/180
+    Center.translation.z = (data.pinky_proximal.y + data.thumb_metacarpal.y)/2/1000 -0.15
+    Center.rotation.x = - data.ypr.y * math.pi/180 * 1.5
 
     Thumb = numpy.array([data.thumb_tip.x, data.thumb_tip.y, data.thumb_tip.z])
     Middle = numpy.array([data.middle_tip.x, data.middle_tip.y, data.middle_tip.z])
 
-    Center.rotation.w = -0.7 + 1.7*numpy.linalg.norm(Thumb-Middle)/MaxDis
+    #Center.rotation.w = -0.7 + 1.7*numpy.linalg.norm(Thumb-Middle)/MaxDis
+    Center.rotation.w = 0.0
 
     """
     Center.translation.x = 0.00

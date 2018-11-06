@@ -273,6 +273,7 @@ class IKControl(wx.Frame):
             wrist_ang = 0.0
             arm_shoulder_lift = math.pi/2 - theta_4d
 
+        rospy.loginfo(a)
         try:
             deg = np.array([arm_elbow_flex,arm_shoulder_lift,arm_shoulder_pan,arm_wrist_flex,self.targetpos.grip])
             return deg
@@ -284,7 +285,7 @@ class IKControl(wx.Frame):
         count=0
         try:
             deg = self.IKsol()
-            # send joint updates
+            # send joint updatesa
             for s,p in zip(self.servos,self.publishers):
 
                 d = Float64()

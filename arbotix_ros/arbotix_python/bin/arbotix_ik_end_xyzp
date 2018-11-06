@@ -37,6 +37,7 @@ from math import radians
 from geometry_msgs.msg import Twist
 from geometry_msgs.msg import Vector3
 from sensor_msgs.msg import JointState
+from geometry_msgs.msg import Transform
 from std_msgs.msg import Float64
 from arbotix_msgs.srv import Relax
 from arbotix_python.joints import *
@@ -64,6 +65,13 @@ class servoSlider():
     def getPosition(self):
         return self.position.GetValue()/100.0
 
+class XYZP:
+    def __init__(self, x=0.0, y=0.0, z=0.0, pitch=math.pi/2):
+        self.x = x
+        self.y = y
+        self.z = z
+        self.pitch = pitch
+
 class IKControl(wx.Frame):
     TIMER_ID = 100
 
@@ -89,7 +97,7 @@ class IKControl(wx.Frame):
         self.servos = list()
         self.publishers = list()
         self.relaxers = list()
-        self.targetpos = Vector3()
+        self.targetpos = XYZP()
 
         joints = rospy.get_param('/arbotix/joints', dict())
         # create sliders and publishers
@@ -115,13 +123,11 @@ class IKControl(wx.Frame):
         self.Bind(wx.EVT_CHECKBOX, self.enableSliders)
         # now we can subscribe
         rospy.Subscriber('joint_states', JointState, self.stateCb)
-        # now we can subscribe
-        rospy.Subscriber('joint_states', JointState, self.stateCb)
 
-        rospy.Subscriber("tap_pos", Vector3, self.poscallback)
+        rospy.Subscriber("hand_pos", Transform, self.transcallback)
         self.targetpos.x = 0.0
         self.targetpos.y = 0.0
-        self.targetpos.z = TargetZ
+        self.targetpos.z = 0.38 - L_4G
         # timer for output
 
 
@@ -173,11 +179,13 @@ class IKControl(wx.Frame):
             self.turn = 0; self.X = 0
         self.onPaint()
 
-    def poscallback(self,data):
-        print(data.x)
-        self.targetpos.x = data.x
-        self.targetpos.y = data.y
-        self.targetpos.z = data.z
+    def transcallback(self,data):
+        #print(data.translation.x)
+        self.targetpos.x = data.translation.x
+        self.targetpos.y = data.translation.y
+        self.targetpos.z = data.translation.z
+        self.targetpos.pitch = data.rotation.x
+        #rospy.loginfo("subscribe")
 
     def wristcal(self,deg):
         if (deg < -2.61 or 2.61 < deg):
@@ -189,28 +197,18 @@ class IKControl(wx.Frame):
     def IKsol(self):
 
         arm_shoulder_pan = math.atan2(self.targetpos.y,self.targetpos.x)
-        arm_elbow_flex = 0.0
-        arm_shoulder_lift = 0.0
-        arm_wrist_flex = 0.0
 
-        wrist_ang = self.wristcal(arm_shoulder_pan)
+        wrist_ang = self.targetpos.pitch
+        R_24 = math.sqrt((self.targetpos.x)**2 + (self.targetpos.y**2)) - L_4G*math.cos(wrist_ang)
+        Z_24 = self.targetpos.z + L_4G*math.sin(wrist_ang) - L_B2
 
-        if wrist_ang == math.pi/2:
-            R_24 = math.sqrt((self.targetpos.x)**2 + (self.targetpos.y**2)) - L_4G*math.cos(wrist_ang)
-            Z_24 = self.targetpos.z + L_4G*math.sin(wrist_ang) - L_B2
-        else:
-            if arm_shoulder_pan >= 0:
-                arm_shoulder_pan = arm_shoulder_pan - math.pi
-            else:
-                arm_shoulder_pan = arm_shoulder_pan + math.pi
-            R_24 = math.sqrt((self.targetpos.x)**2 + (self.targetpos.y**2)) - L_4G*math.cos(wrist_ang)
-            Z_24 = self.targetpos.z + L_4G*math.sin(-wrist_ang) - L_B2
-
+        #rospy.loginfo("R_24 = %f",R_24)
+        #rospy.loginfo("Z_24 = %f",Z_24)
         a=0
 
-        #rospy.loginfo(wrist_ang)
-        if math.sqrt((self.targetpos.x)**2 + (self.targetpos.y**2)) < (L_23 + L_34):
+        if math.sqrt((self.targetpos.x)**2 + (self.targetpos.y**2)) < (L_23 + L_34 + L_4G):
             a=1
+
             if wrist_ang == math.pi/2:
                 if -1 <= ((L_23)**2 - (L_34)**2 + (R_24)**2 + (Z_24) **2)/(2 * L_23 * math.sqrt((R_24)**2 + (Z_24)**2)) and ((L_23)**2 - (L_34)**2 + (R_24)**2 + (Z_24) **2)/(2 * L_23 * math.sqrt((R_24)**2 + (Z_24)**2)) <=1:
                     theta_2d = math.acos(((L_23)**2 - (L_34)**2 + (R_24)**2 + (Z_24) **2)/(2 * L_23 * math.sqrt((R_24)**2 + (Z_24)**2)))
@@ -240,6 +238,7 @@ class IKControl(wx.Frame):
                     #rospy.loginfo(((L_23)**2 - (L_34)**2 + (R_24)**2 + (Z_24) **2)/(2 * L_23 * math.sqrt((R_24)**2 + (Z_24)**2)))
                     pass
             else:
+                #rospy.loginfo(((L_23)**2 - (L_34)**2 + (R_24)**2 + (Z_24) **2)/(2 * L_23 * math.sqrt((R_24)**2 + (Z_24)**2)))
                 if -1 <= ((L_23)**2 - (L_34)**2 + (R_24)**2 + (Z_24) **2)/(2 * L_23 * math.sqrt((R_24)**2 + (Z_24)**2)) and ((L_23)**2 - (L_34)**2 + (R_24)**2 + (Z_24) **2)/(2 * L_23 * math.sqrt((R_24)**2 + (Z_24)**2)) <=1:
                     theta_2d = math.acos(((L_23)**2 - (L_34)**2 + (R_24)**2 + (Z_24) **2)/(2 * L_23 * math.sqrt((R_24)**2 + (Z_24)**2)))
                     a=2
@@ -248,9 +247,9 @@ class IKControl(wx.Frame):
 
                         theta_4d = math.atan2(Z_24, R_24)
 
-                        arm_shoulder_lift = -(math.pi/2 - (theta_2d + theta_4d))
-                        arm_elbow_flex = -(theta_2d + theta_3d)
-                        arm_wrist_flex = -(theta_4d - theta_3d - wrist_ang)
+                        arm_shoulder_lift = math.pi/2 - (theta_2d + theta_4d)
+                        arm_elbow_flex = theta_2d + theta_3d
+                        arm_wrist_flex = theta_4d - theta_3d + wrist_ang
 
                         if self.flag == 0:
                             rospy.loginfo(arm_shoulder_pan * 180 / math.pi)
@@ -269,16 +268,20 @@ class IKControl(wx.Frame):
                     #rospy.loginfo(((L_23)**2 - (L_34)**2 + (R_24)**2 + (Z_24) **2)/(2 * L_23 * math.sqrt((R_24)**2 + (Z_24)**2)))
                     pass
         else:
-            pass
+            arm_elbow_flex = 0.0
+            arm_wrist_flex = 0.0
 
+            wrist_ang = 0.0
+            arm_shoulder_lift = math.pi/2 - theta_4d
 
-        deg = np.array([arm_elbow_flex,arm_shoulder_lift,arm_shoulder_pan,arm_wrist_flex,0])
-        #deg = np.array([0.0,0.0,0.0,0.0,0.0])
-        #rospy.loginfo(deg)
         #rospy.loginfo(a)
-        return deg
 
-
+        try:
+            deg = np.array([arm_elbow_flex,arm_shoulder_lift,arm_shoulder_pan,arm_wrist_flex,0])
+            #rospy.loginfo("calculated")
+            return deg
+        except:
+            pass
 
 
     def update(self):
@@ -288,10 +291,14 @@ class IKControl(wx.Frame):
         for s,p in zip(self.servos,self.publishers):
 
             d = Float64()
-            d.data = deg[count]
-            #rospy.loginfo(d.data)
-            p.publish(d)
-            count=count+1
+            try:
+                d.data = deg[count]
+                #rospy.loginfo(d.data)
+                p.publish(d)
+                count=count+1
+                #rospy.loginfo("published")
+            except:
+                pass
             #if s.enabled.IsChecked():
 
         # send base updates

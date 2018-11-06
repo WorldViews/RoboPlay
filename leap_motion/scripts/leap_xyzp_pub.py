@@ -33,7 +33,7 @@ def callback_ros(data):
     Center.translation.x = -(data.pinky_proximal.z + data.thumb_metacarpal.z)/2/1000
     Center.translation.y = -(data.pinky_proximal.x + data.thumb_metacarpal.x)/2/1000
     Center.translation.z = (data.pinky_proximal.y + data.thumb_metacarpal.y)/2/1000 - 0.15
-    Center.rotation.x = - data.ypr.y * math.pi/180
+    Center.rotation.x = - data.ypr.y * math.pi/180*2
 
     """
     Center.translation.x = 0.00

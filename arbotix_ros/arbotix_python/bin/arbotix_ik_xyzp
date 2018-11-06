@@ -196,24 +196,16 @@ class IKControl(wx.Frame):
     def IKsol(self):
 
         arm_shoulder_pan = math.atan2(self.targetpos.y,self.targetpos.x)
-        arm_elbow_flex = 0.0
-        arm_shoulder_lift = 0.0
-        arm_wrist_flex = 0.0
 
-        wrist_ang = self.targetpos.pitch
 
-        if wrist_ang == math.pi/2:
-            R_24 = math.sqrt((self.targetpos.x)**2 + (self.targetpos.y**2))
-            Z_24 = self.targetpos.z - L_B2
-        else:
-            R_24 = math.sqrt((self.targetpos.x)**2 + (self.targetpos.y**2))
-            Z_24 = self.targetpos.z - L_B2
+        R_24 = math.sqrt((self.targetpos.x)**2 + (self.targetpos.y**2))
+        Z_24 = self.targetpos.z - L_B2
 
         a=0
 
-        #rospy.loginfo(wrist_ang)
         if math.sqrt((self.targetpos.x)**2 + (self.targetpos.y**2)) < (L_23 + L_34 + L_4G):
             a=1
+            wrist_ang = self.targetpos.pitch
             if wrist_ang == math.pi/2:
                 if -1 <= ((L_23)**2 - (L_34)**2 + (R_24)**2 + (Z_24) **2)/(2 * L_23 * math.sqrt((R_24)**2 + (Z_24)**2)) and ((L_23)**2 - (L_34)**2 + (R_24)**2 + (Z_24) **2)/(2 * L_23 * math.sqrt((R_24)**2 + (Z_24)**2)) <=1:
                     theta_2d = math.acos(((L_23)**2 - (L_34)**2 + (R_24)**2 + (Z_24) **2)/(2 * L_23 * math.sqrt((R_24)**2 + (Z_24)**2)))
@@ -272,13 +264,17 @@ class IKControl(wx.Frame):
                     #rospy.loginfo(((L_23)**2 - (L_34)**2 + (R_24)**2 + (Z_24) **2)/(2 * L_23 * math.sqrt((R_24)**2 + (Z_24)**2)))
                     pass
         else:
+            arm_elbow_flex = 0.0
+            arm_wrist_flex = 0.0
+
+            wrist_ang = 0.0
+            arm_shoulder_lift = math.pi/2 - theta_4d
+
+        try:
+            deg = np.array([arm_elbow_flex,arm_shoulder_lift,arm_shoulder_pan,arm_wrist_flex,0])
+            return deg
+        except:
             pass
-
-
-        deg = np.array([arm_elbow_flex,arm_shoulder_lift,arm_shoulder_pan,arm_wrist_flex,0])
-        #deg = np.array([0.0,0.0,0.0,0.0,0.0])
-        #rospy.loginfo(deg)
-        #rospy.loginfo(a)
         return deg
 
 
