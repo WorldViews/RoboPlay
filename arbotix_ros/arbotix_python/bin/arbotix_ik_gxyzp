@@ -264,7 +264,7 @@ class IKControl(wx.Frame):
                         pass
 
                 else:
-                    #rospy.loginfo(((L_23)**2 - (L_34)**2 + (R_24)**2 + (Z_24) **2)/(2 * L_23 * math.sqrt((R_24)**2 + (Z_24)**2)))
+                    rospy.loginfo(((L_23)**2 - (L_34)**2 + (R_24)**2 + (Z_24) **2)/(2 * L_23 * math.sqrt((R_24)**2 + (Z_24)**2)))
                     pass
         else:
             arm_elbow_flex = 0.0
@@ -273,7 +273,7 @@ class IKControl(wx.Frame):
             wrist_ang = 0.0
             arm_shoulder_lift = math.pi/2 - theta_4d
 
-        rospy.loginfo(a)
+        #rospy.loginfo(a)
         try:
             deg = np.array([arm_elbow_flex,arm_shoulder_lift,arm_shoulder_pan,arm_wrist_flex,self.targetpos.grip])
             return deg

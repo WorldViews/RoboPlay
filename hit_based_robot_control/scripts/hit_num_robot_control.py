@@ -108,7 +108,7 @@ def geomPub():
         try:
             (trans,rot) = Gripper_pos.lookupTransform('/base_link','/gripper_link',rospy.Time(0))
             now_z = trans[2]
-            #rospy.loginfo(trans)
+            rospy.loginfo(trans)
         except:
             pass
 
@@ -154,8 +154,8 @@ def geomPub():
                         tapped_pos.rotation.x = Wrist_Ang_Far
                     else:
                         tapped_pos.rotation.x = Wrist_Ang_Near
-                    rospy.loginfo("now_z: %f", now_z)
-                    rospy.loginfo("tapped_pos.translation.z: %f", tapped_pos.translation.z)
+                    #rospy.loginfo("now_z: %f", now_z)
+                    #rospy.loginfo("tapped_pos.translation.z: %f", tapped_pos.translation.z)
 
                 #a = 0
                 #rospy.loginfo("up")
@@ -198,10 +198,10 @@ def geomPub():
 
 
 
-        #rospy.loginfo("x: %f", tapped_pos.translation.x)
-        #rospy.loginfo("y: %f", tapped_pos.translation.y)
-        #rospy.loginfo("z: %f", tapped_pos.translation.z)
-        #rospy.loginfo("wrist_ang: %f", tapped_pos.rotation.x)
+        rospy.loginfo("x: %f", tapped_pos.translation.x)
+        rospy.loginfo("y: %f", tapped_pos.translation.y)
+        rospy.loginfo("z: %f", tapped_pos.translation.z)
+        rospy.loginfo("wrist_ang: %f", tapped_pos.rotation.x)
 
 
         old_z = now_z

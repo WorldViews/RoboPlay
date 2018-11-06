@@ -206,6 +206,11 @@ class IKControl(wx.Frame):
         #rospy.loginfo("Z_24 = %f",Z_24)
         a=0
 
+        #rospy.loginfo("targetpos.x: %f", self.targetpos.x)
+        #rospy.loginfo("targetpos.y: %f", self.targetpos.y)
+        #rospy.loginfo("targetpos.z: %f", self.targetpos.z)
+        #rospy.loginfo("wrist_ang: %f", self.targetpos.pitch)
+
         if math.sqrt((self.targetpos.x)**2 + (self.targetpos.y**2)) < (L_23 + L_34 + L_4G):
             a=1
 
