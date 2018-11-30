@@ -1,0 +1,6 @@
+<launch>
+
+  <node name="arbotix_fk" pkg="arbotix_python" type="arbotix_fk"/>
+  <node name="slave_output" pkg="output" type="slave_output.py"/>
+
+</launch>

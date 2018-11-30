@@ -1,4 +1,5 @@
 <launch>
   <node name="arbotix_ik_end_xyzp" pkg="arbotix_python" type="arbotix_ik_end_xyzp"/>
   <node name="hit_num_robot_control" pkg="hit_based_robot_control" type="hit_num_robot_control.py"/>
+  <node name="hit_output" pkg="output" type="hit_output.py"/>
 </launch>

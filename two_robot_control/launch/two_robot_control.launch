@@ -1,0 +1,5 @@
+<launch>
+  <node name="read_deg_of_servo" pkg="two_robot_control" type="read_deg_of_servo.py"/>
+  <node name="master_output" pkg="output" type="master_output.py"/>
+
+</launch>

@@ -27,10 +27,10 @@ White = [-0.08, -0.23, DownHeight, Wrist_Ang_Far]
 White_Up = [-0.08, -0.23, UpHeight, Wrist_Ang_Far]
 Red_Right = [-0.08, -0.15, DownHeight, Wrist_Ang_Near]
 Red_Right_Up = [-0.08, -0.15, UpHeight, Wrist_Ang_Near]
-Green = [0.00, -0.14, DownHeight, Wrist_Ang_Near]
-Green_Up = [0.00, -0.14, UpHeight, Wrist_Ang_Near]
-Blue = [0.08, -0.14, DownHeight, Wrist_Ang_Near]
-Blue_Up = [0.08, -0.14, UpHeight, Wrist_Ang_Near]
+Green = [0.00, -0.15, DownHeight, Wrist_Ang_Near]
+Green_Up = [0.00, -0.15, UpHeight, Wrist_Ang_Near]
+Blue = [0.08, -0.15, DownHeight, Wrist_Ang_Near]
+Blue_Up = [0.08, -0.15, UpHeight, Wrist_Ang_Near]
 
 RobotAngles = [0.0, 0.0, 0.0, 0.0, 0.0]
 
@@ -108,7 +108,7 @@ def geomPub():
         try:
             (trans,rot) = Gripper_pos.lookupTransform('/base_link','/gripper_link',rospy.Time(0))
             now_z = trans[2]
-            rospy.loginfo(trans)
+            #rospy.loginfo(trans)
         except:
             pass
 
@@ -117,23 +117,23 @@ def geomPub():
         if hit_num == 0:        #Red_Left
             Destination = Red_Left
         elif hit_num == 1:        #Yellow
-            Destination = Yellow
-        elif hit_num == 2:        #White
-            Destination = White
-        elif hit_num == 3:        #Red_Right
-            Destination = Red_Right
-        elif hit_num == 4:        #Green
-            Destination = Green
-        elif hit_num == 5:        #Blue
             Destination = Blue
+        elif hit_num == 2:        #White
+            Destination = Yellow
+        elif hit_num == 3:        #Red_Right
+            Destination = Green
+        elif hit_num == 4:        #Green
+            Destination = White
+        elif hit_num == 5:        #Blue
+            Destination = Red_Right
 
         if (abs(trans[0]-Destination[0]) > 0.01 or abs(trans[1]-Destination[1]) > 0.01) and flags !=2:        #gripper is not above Destination
             #First, up the gripper
-            if now_z < 0.025:
+            if now_z < 0.04:
                 if flags == 1 and flag == 0:
                     tapped_pos.translation.x = Destination[0]
                     tapped_pos.translation.y = Destination[1]
-                    if Destination < 3:
+                    if (hit_num % 2) == 0:
                         tapped_pos.translation.z = UpHeight + 0.04
                     else:
                         tapped_pos.translation.z = UpHeight
@@ -145,7 +145,7 @@ def geomPub():
                     a = 0.2
                     tapped_pos.translation.x = trans[0]
                     tapped_pos.translation.y = trans[1]
-                    if Destination < 3:
+                    if (hit_num % 2) == 0:
                         tapped_pos.translation.z = UpHeight + 0.04
                     else:
                         tapped_pos.translation.z = UpHeight
@@ -162,7 +162,7 @@ def geomPub():
             else:      #go to the Destination (x and y only)
                 tapped_pos.translation.x = Destination[0]
                 tapped_pos.translation.y = Destination[1]
-                if Destination < 3:
+                if (hit_num % 2) == 0:
                     tapped_pos.translation.z = UpHeight + 0.04
                 else:
                     tapped_pos.translation.z = UpHeight
@@ -177,20 +177,32 @@ def geomPub():
             if Destination == Old_Destination:      #Already pushed the button
                 tapped_pos.translation.x = Destination[0]
                 tapped_pos.translation.y = Destination[1]
-                if Destination < 3:
+                if (hit_num % 2) == 0:
                     tapped_pos.translation.z = UpHeight + 0.04
                 else:
                     tapped_pos.translation.z = UpHeight
                 a = 2
                 flags = 0
             else:       #Not push the button yet
-                tapped_pos.translation.x = Destination[0]
-                tapped_pos.translation.y = Destination[1]
-                tapped_pos.translation.z = DownHeight
+                if a!= 3:
+                    start = rospy.get_time()
+                else:
+                    now = rospy.get_time()
+                    if now - start > 0.5:
+                        Old_Destination = Destination
+                        if (hit_num % 2) == 0:
+                            tapped_pos.translation.z = UpHeight + 0.04
+                        else:
+                            tapped_pos.translation.z = UpHeight
+                        a = 4
+                    else:
+                        tapped_pos.translation.x = Destination[0]
+                        tapped_pos.translation.y = Destination[1]
+                        tapped_pos.translation.z = DownHeight
                 a = 3
-                if now_z > old_z and now_z < 0.015:
+                if now_z > old_z and now_z < 0.04:
                     Old_Destination = Destination
-                    if Destination < 3:
+                    if (hit_num % 2) == 0:
                         tapped_pos.translation.z = UpHeight + 0.04
                     else:
                         tapped_pos.translation.z = UpHeight
@@ -198,14 +210,14 @@ def geomPub():
 
 
 
-        rospy.loginfo("x: %f", tapped_pos.translation.x)
-        rospy.loginfo("y: %f", tapped_pos.translation.y)
-        rospy.loginfo("z: %f", tapped_pos.translation.z)
-        rospy.loginfo("wrist_ang: %f", tapped_pos.rotation.x)
+        #rospy.loginfo("x: %f", tapped_pos.translation.x)
+        #rospy.loginfo("y: %f", tapped_pos.translation.y)
+        #rospy.loginfo("z: %f", tapped_pos.translation.z)
+        #rospy.loginfo("wrist_ang: %f", tapped_pos.rotation.x)
 
 
         old_z = now_z
-        #rospy.loginfo(a)
+        rospy.loginfo(a)
         #Old_Destination =Destination
         #print(tapped_pos.z)
         pub.publish(tapped_pos)

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+aa#!/usr/bin/env python
 
 """
   A simple Controller GUI to drive robots and pose heads.
@@ -26,6 +26,7 @@
   OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
   ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
+
 
 import rospy
 import wx
@@ -111,8 +112,7 @@ class FKControl(wx.Frame):
         self.Bind(wx.EVT_CHECKBOX, self.enableSliders)
         # now we can subscribe
         rospy.Subscriber('joint_states', JointState, self.stateCb)
-        # now we can subscribe
-        rospy.Subscriber('joint_states', JointState, self.stateCb)
+
 
         self.targetpos.x = 0.0
         self.targetpos.y = 0.0
@@ -124,7 +124,11 @@ class FKControl(wx.Frame):
         # timer for output
 
     def deg_callback(self, data):
-        self.deg_of_each_servo = data.data
+        a = 0
+        for i in data.data:
+            self.deg_of_each_servo[a] = data.data[a]
+            a = a + 1
+
 
     def onClose(self, event):
         self.timer.Stop()
@@ -194,7 +198,8 @@ class FKControl(wx.Frame):
 
             d = Float64()
             d.data = self.deg_of_each_servo[count]
-            #rospy.loginfo(d.data)
+            if count == 3:
+                rospy.loginfo(d.data)
             p.publish(d)
             count=count+1
             #if s.enabled.IsChecked():
