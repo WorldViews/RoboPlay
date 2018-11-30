@@ -1,20 +1,46 @@
-# RoboPlay
-for playing with trossen robot arm
+Setup for MS mode
 
-Master-slave using 2 robot arms
+Slave
+Roscore
+Plug in the robot’s cable
+sudo chmod 777 /dev/ttyUSB0                            (for permission)
+roslaunch phantomx_rst arm.launch                          (for set up the robot)
 
-Master robot (operated by humans) commands
+Master
+Plug in the robot’s cable
+sudo chmod 777 /dev/ttyUSB0                        (for permission)
+roslaunch phantomx_rst master_arm.launch                        (for set up the robot)
+roslaunch two_robot_control two_robot_control.launch                 (to start sending the joint angles)
 
-  sudo chmod 777 /dev/ttyUSB0
 
-  roslaunch phantomx_rst arm.launch
 
-  rosrun two_robot_control read_deg_of_servo.py
-  
-Slave robot (follows the master robot) commands
+Go back to Slave
+roslaunch output ms_output.launch             (to start receiving the joint angles and move the robot)
 
-  sudo chmod 777 /dev/ttyUSB0
+If you start “roslaunch output ms_output.launch” without starting “roslaunch two_robot_control two_robot_control.launch”, the robot arm goes to the initial position, so the robot arm may contact with some obstacles and may be broken.
 
-  roslaunch phantomx_rst arm.launch
 
-  rosrun arbotix_python arbotix_fk
+Setup for Leap Mode
+Slave
+roscore
+sudo chmod 777 /dev/ttyUSB0
+roslaunch phantomx_rst arm.launch
+
+Master
+Connect Leap via USB
+roslaunch leap_motion leap_robot_gxyzp.launch
+
+Setup for Click Mode
+Slave
+roscore
+sudo chmod 777 /dev/ttyUSB0
+roslaunch phantomx_rst arm.launch
+
+Master
+runserver
+
+go back to SLAVE
+roslaunch rosbridge_server rosbridge_websocket.launch                     (for set up the communication)
+roslaunch hit_based_robot_control hit_num_robot_control.launch
+
+
