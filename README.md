@@ -1,1 +1,1 @@
-Look at setup.txt file 
+Look at Setup_Guide.txt file 
