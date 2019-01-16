@@ -2,5 +2,7 @@
 
 echo "MS Mode: Master"
 
-roslaunch phantomx_rst master_arm.launch
-roslaunch two_robot_control two_robot_control.launch
+killall roslaunch
+roslaunch phantomx_rst master_arm.launch &
+# sleep 5
+roslaunch two_robot_control two_robot_control.launch &
