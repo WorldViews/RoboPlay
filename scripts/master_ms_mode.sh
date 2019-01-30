@@ -4,5 +4,5 @@ echo "MS Mode: Master"
 
 killall roslaunch
 roslaunch phantomx_rst master_arm.launch &
-sleep 5
+until rostopic list ; do sleep 1; done
 roslaunch two_robot_control two_robot_control.launch &

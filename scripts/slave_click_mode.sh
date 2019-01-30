@@ -4,8 +4,7 @@ echo "Click Mode: Slave"
 
 killall roscore
 killall roslaunch
-roscore &
 roslaunch phantomx_rst arm.launch &
-sleep 10
+until rostopic list ; do sleep 1; done
 roslaunch rosbridge_server rosbridge_websocket.launch &
 roslaunch hit_based_robot_control hit_num_robot_control.launch &
